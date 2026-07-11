@@ -8,3 +8,13 @@ GPT2_SMALL_124M = {
     'qkv_bias': True,
     
 }
+
+GPT2_MEDIUM_355M = {
+    'vocab_size': 50257,
+    'context_length': 1024,
+    'drop_rate': 0.0,
+    'qkv_bias': True,
+    'emb_dim': 1024,
+    'num_heads': 16,
+    'n_layers': 24,
+}
