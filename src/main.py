@@ -53,7 +53,7 @@ class MultiHeadAttention(nn.Module):
         self.W_key: nn.Linear = nn.Linear(in_features=self.emb_dim, out_features=self.emb_dim, bias=self.qkv_bias)
         self.W_value: nn.Linear = nn.Linear(in_features=self.emb_dim, out_features=self.emb_dim, bias=self.qkv_bias)
 
-        self.register_buffer('mask', torch.triu(torch.ones((self.context_length, self.context_length)), diagonal=1))
+        self.register_buffer('mask', torch.triu(torch.ones((self.context_length, self.context_length)), diagonal=1), persistent=False)
 
         self.out_proj: nn.Linear = nn.Linear(in_features=self.emb_dim, out_features=self.emb_dim)
 
@@ -131,7 +131,7 @@ class GPTModel(nn.Module):
         super().__init__()
 
         self.token_embeddings: nn.Embedding = nn.Embedding(num_embeddings=cfg['vocab_size'], embedding_dim=cfg['emb_dim'])
-        self.position_embeddings: nn.Embedding = nn.Embedding(num_embeddings=cfg['vocab_size'], embedding_dim=cfg['emb_dim'])
+        self.position_embeddings: nn.Embedding = nn.Embedding(num_embeddings=cfg['context_length'], embedding_dim=cfg['emb_dim'])
 
         self.dropout: nn.Dropout = nn.Dropout(p=cfg['drop_rate'])
 
@@ -140,7 +140,7 @@ class GPTModel(nn.Module):
         )
 
         self.final_layer_norm: LayerNorm = LayerNorm(cfg=cfg)
-        self.out_head: nn.Linear = nn.Linear(in_features=cfg['emb_dim'], out_features=cfg['vocab_size'])
+        self.out_head: nn.Linear = nn.Linear(in_features=cfg['emb_dim'], out_features=cfg['vocab_size'], bias=False)
 
     def forward(self, input_tokens: torch.Tensor) -> torch.Tensor:
         batch, seq_len = input_tokens.shape
