@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from pathlib import Path
-
+from main import GPTModel
 import torch
 import torch.nn as nn
+import config
 
 
 def extract_state_dict(checkpoint: object) -> Mapping[str, torch.Tensor]:
@@ -50,6 +51,7 @@ def convert_checkpoint_key(old_key: str) -> str:
 def load_converted_weights(
     model: nn.Module,
     checkpoint_path: str | Path,
+    out_file: str | Path,
     device: str | torch.device = "cpu",
 ) -> None:
     checkpoint = torch.load(
@@ -118,5 +120,16 @@ def load_converted_weights(
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         }, 
-        "../models/gpt2_small_model_and_optimizer.pth"
+        out_file
+    )
+
+if __name__ == '__main__':
+    in_filename = '../models/gpt2-medium-355M.pth'
+    out_file = '../models/gpt2_medium_model_and_optimizer.pth'
+    gpt = GPTModel(cfg=config.GPT2_MEDIUM_355M)
+    load_converted_weights(
+        model=gpt,
+        checkpoint_path=in_filename,
+        out_file=out_file,
+        device="cpu",
     )
