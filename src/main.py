@@ -253,7 +253,7 @@ def generate(model, idx, max_new_tokens, context_size, temperature=0.0, top_k=No
     return idx
     
 
-def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs, tokenizer,):
+def train_model_simple(model, train_loader, val_loader, optimizer, device, num_epochs, start_context, tokenizer,):
     train_losses, val_losses, track_tokens_seen = [], [], []
     tokens_seen, global_step = 0, -1
     eval_freq = 5
@@ -279,7 +279,7 @@ def train_model_simple(model, train_loader, val_loader, optimizer, device, num_e
 
         token_ids = generate(
             model=model,
-            idx=text_to_token_ids('Every effort moves you', tokenizer=tokenizer).to('cuda'),
+            idx=text_to_token_ids(start_context, tokenizer=tokenizer).to('cuda'),
             max_new_tokens=15,
             context_size=256,
             top_k=25,
