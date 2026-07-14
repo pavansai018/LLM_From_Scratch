@@ -94,22 +94,34 @@ class GPT2DetoxInference:
 
         input_ids = torch.tensor(prompt_token_ids, dtype=torch.long, device=self.device,).unsqueeze(0)
         generated_token_ids: list[int] = []
-        for _ in range(max_new_tokens):
-            # Keep the sequence inside the model's context window.
-            model_input = input_ids[:,-self.context_length:,]
-            # logits:
-            # [batch, sequence_length, vocabulary_size]
-            logits = self.model(model_input)
-            # Distribution for the token immediately after
-            # the current sequence.
+        generation_steps = min(max_new_tokens, self.context_length - len(prompt_token_ids))
+        logits, kv_cache = self.model(x=input_ids, use_cache=True)
+        for step in range(generation_steps):
             next_token_logits = logits[:, -1, :]
-            # Greedy decoding gives deterministic output.
-            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True,)
+            next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True)
             token_id = int(next_token_id.item())
             if token_id == self.eos_token_id:
                 break
             generated_token_ids.append(token_id)
-            input_ids = torch.cat([input_ids, next_token_id], dim=1,)
+            if step == generation_steps - 1:
+                break
+            logits, kv_cache = self.model(x=next_token_id, kv_cache=kv_cache, use_cache=True)
+        # for _ in range(max_new_tokens):
+        #     # Keep the sequence inside the model's context window.
+        #     model_input = input_ids[:,-self.context_length:,]
+        #     # logits:
+        #     # [batch, sequence_length, vocabulary_size]
+        #     logits = self.model(model_input)
+        #     # Distribution for the token immediately after
+        #     # the current sequence.
+        #     next_token_logits = logits[:, -1, :]
+        #     # Greedy decoding gives deterministic output.
+        #     next_token_id = torch.argmax(next_token_logits, dim=-1, keepdim=True,)
+        #     token_id = int(next_token_id.item())
+        #     if token_id == self.eos_token_id:
+        #         break
+        #     generated_token_ids.append(token_id)
+        #     input_ids = torch.cat([input_ids, next_token_id], dim=1,)
         response = self.tokenizer.decode(generated_token_ids)
         return response.strip()
 
