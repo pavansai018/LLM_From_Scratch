@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import config
-
+from kv_cache import PastKeyValue
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, cfg: dict = config.GPT2_SMALL_124M):
@@ -22,7 +22,7 @@ class MultiHeadAttention(nn.Module):
         self.register_buffer(name='mask', tensor=torch.triu(input=torch.ones(size=(self.context_length, self.context_length)), diagonal=1), persistent=False)
         self.out_proj: nn.Linear = nn.Linear(in_features=self.emb_dim, out_features=self.emb_dim)
 
-    def forward(self, input_embeddings: torch.Tensor) -> torch.Tensor:
+    def forward(self, input_embeddings: torch.Tensor, pas_key_value: PastKeyValue | None = None, use_cache: bool = False) -> torch.Tensor | tuple[torch.Tensor, PastKeyValue]:
         batch, num_tokens, d_in = input_embeddings.shape
 
         # [batch, num_tokens, emb_dim]
@@ -40,6 +40,16 @@ class MultiHeadAttention(nn.Module):
         keys = keys.transpose(dim0=1, dim1=2)
         values = values.transpose(dim0=1, dim1=2)
 
+        past_length = 0
+        if pas_key_value is not None:
+            if not use_cache:
+                raise ValueError('past_key_value requires use_cache=True')
+            past_keys, past_values = pas_key_value
+            past_length = past_keys.size(2)
+            keys = torch.cat(tensors=(past_keys, keys), dim=2)
+            values = torch.cat(tensors=(past_values, values), dim=2)
+
+
         '''
         queries: [batch, num_heads, num_tokens, head_dim]
         keys: [batch, num_heads, num_tokens, head_dim]
@@ -47,7 +57,9 @@ class MultiHeadAttention(nn.Module):
         attention_scores: [batch, num_heads, num_tokens, num_tokens]
         '''
         attention_scores: torch.Tensor = queries @ keys.transpose(dim0=2, dim1=3)
-        mask: torch.Tensor = self.mask.bool()[:num_tokens, :num_tokens]
+        keys_length = keys.size(2)
+        # mask: torch.Tensor = self.mask.bool()[:num_tokens, :num_tokens]
+        mask: torch.Tensor = self.mask.bool()[past_length:past_length + num_tokens, :keys_length]
         attention_scores.masked_fill_(mask=mask, value=-torch.inf)
         attention_weights: torch.Tensor = torch.softmax(input=attention_scores/keys.shape[-1] ** 0.5, dim=-1)
         attention_weights = self.dropout(attention_weights)
@@ -62,6 +74,10 @@ class MultiHeadAttention(nn.Module):
         # [batch, num_tokens, emb_dim]
         context_vector = context_vector.contiguous().view(batch, num_tokens, d_in)
 
-        return self.out_proj(context_vector)
+        output = self.out_proj(context_vector)
+        if use_cache:
+            present_key_value: PastKeyValue = (keys, values)
+            return output, present_key_value
+        return output
     
 
